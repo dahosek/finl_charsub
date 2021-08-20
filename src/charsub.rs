@@ -13,6 +13,9 @@ use anyhow;
 use thiserror::Error;
 use std::path::PathBuf;
 use std::collections::HashMap;
+use std::cell::RefCell;
+use std::borrow::Cow;
+use std::ops::Deref;
 
 #[derive(Error, Debug)]
 pub enum CharSubError {
@@ -22,15 +25,16 @@ pub enum CharSubError {
 
 pub struct CharSubMachine {
     tree: SubstitutionTree,
-    output_buffer: String,
+    output_buffer: Option<String>,
+    current_node: Option<RefCell<SubstitutionTree>>
 }
 
-impl<'a> CharSubMachine {
+impl CharSubMachine {
     fn new() -> CharSubMachine {
-        let tree = SubstitutionTree::new();
         CharSubMachine {
-            tree: tree,
-            output_buffer: String::with_capacity(80),
+            tree: SubstitutionTree::new(),
+            output_buffer: None,
+            current_node: None
         }
     }
 
@@ -39,17 +43,19 @@ impl<'a> CharSubMachine {
     }
 
     fn flush(&mut self) -> Option<String> {
-        if self.output_buffer.is_empty() {
-            None
-        }
-        else {
-            let return_string = self.output_buffer.clone();
-            self.output_buffer.truncate(0);
-            Some(return_string)
-        }
+        return self.output_buffer.take();
     }
 
-    fn process(&mut self, input: &str) -> Option<String> {
+    fn process<'a>(&mut self, input: &'a str) -> Option<Cow<'a, str>> {
+        // let mut node = match &self.current_node {
+        //     None => &RefCell::new(&self.tree),
+        //     Some(node) => {
+        //         &node
+        //     }
+        // };
+        for char_loc in input.char_indices() {
+
+        }
         None
     }
 }
@@ -141,6 +147,23 @@ mod tests {
     fn missing_map_to_value_gives_error() {
         assert_eq!(true, parse_charsub_config_line("wrong  ").is_err());
         assert_eq!(true, parse_charsub_config_line("alsoWrong").is_err());
+    }
+
+    #[test]
+    fn flush_clears_output_buffer() {
+        let mut char_sub_machine = CharSubMachine::new();
+        assert_eq!(None, char_sub_machine.flush());
+        char_sub_machine.output_buffer = Some("test".to_string());
+        assert_eq!(Some("test".to_string()), char_sub_machine.flush());
+        assert_eq!(None, char_sub_machine.flush());
+    }
+
+    #[test]
+    fn char_sub_machine_returns_original_string_when_no_substitution() {
+        let mut char_sub_machine = CharSubMachine::new();
+        assert_eq!("original", char_sub_machine.process("original").unwrap());
+        char_sub_machine.add_substitution("'", "’");
+        assert_eq!("original", char_sub_machine.process("original").unwrap());
     }
 
     // Temporary test - manually verified
