@@ -13,9 +13,7 @@ use anyhow;
 use thiserror::Error;
 use std::path::PathBuf;
 use std::collections::HashMap;
-use std::cell::RefCell;
 use std::borrow::Cow;
-use std::ops::Deref;
 
 #[derive(Error, Debug)]
 pub enum CharSubError {
@@ -25,16 +23,14 @@ pub enum CharSubError {
 
 pub struct CharSubMachine {
     tree: SubstitutionTree,
-    output_buffer: Option<String>,
-    current_node: Option<RefCell<SubstitutionTree>>
+    unprocessed: Option<String>
 }
 
 impl CharSubMachine {
     fn new() -> CharSubMachine {
         CharSubMachine {
             tree: SubstitutionTree::new(),
-            output_buffer: None,
-            current_node: None
+            unprocessed: None
         }
     }
 
@@ -42,21 +38,98 @@ impl CharSubMachine {
         self.tree.add(input, output);
     }
 
-    fn flush(&mut self) -> Option<String> {
-        return self.output_buffer.take();
+    // Unfinished code
+    fn process<'a>(&mut self, input: &'a str) -> Cow<'a, str> {
+        let mut curr_node = &self.tree;
+        let mut built_value :Option<String> = None;
+        let mut in_substitution = false;
+        let mut substitution_start = 0;
+        for (loc, ch) in input.char_indices() {
+            if in_substitution && !curr_node.children.contains_key(&ch) {
+                if in_substitution {
+                    match &curr_node.output {
+                        None => {
+                            let (substitution, remainder) = self._flush_substitution(input.get(substitution_start..loc).unwrap());
+                            &built_value.as_mut().unwrap().push_str(substitution.as_str());
+                            if let Some(remainder) = remainder {
+                                &built_value.as_mut().unwrap().push_str(remainder.as_str());
+                            }
+                        }
+                        Some(substitution) => {
+                            &built_value.as_mut().unwrap().push_str(substitution.as_str());
+                        }
+                    }
+                    in_substitution = false;
+                    curr_node = &self.tree;
+                }
+            }
+            if curr_node.children.contains_key(&ch) {
+                if built_value.is_none() {
+                    built_value = Some(String::with_capacity(input.len()));
+                    &built_value.as_mut().unwrap().push_str(input.get(..loc).unwrap());
+                }
+                if !in_substitution {
+                    substitution_start = loc;
+                }
+                in_substitution = true;
+                curr_node = curr_node.children.get(&ch).unwrap();
+            }
+            else {
+                if let Some(output)= &mut built_value {
+                    output.push(ch);
+                }
+            }
+        }
+        if in_substitution {
+            if curr_node.children.is_empty() {
+                &built_value.as_mut().unwrap().push_str(&curr_node.output.as_ref().unwrap().as_str());
+            }
+            else {
+                self.unprocessed = input.get(substitution_start..).map(|s| s.to_string());
+            }
+        }
+        match built_value {
+            None => Cow::Borrowed(input),
+            Some(_) => Cow::Owned(built_value.unwrap())
+        }
     }
 
-    fn process<'a>(&mut self, input: &'a str) -> Option<Cow<'a, str>> {
-        // let mut node = match &self.current_node {
-        //     None => &RefCell::new(&self.tree),
-        //     Some(node) => {
-        //         &node
-        //     }
-        // };
-        for char_loc in input.char_indices() {
-
+    fn flush(&mut self) -> String {
+        match &self.unprocessed {
+            None => String::new(),
+            Some(_) => {
+                let unprocessed = self.unprocessed.take().unwrap();
+                let (rv_part1, rv_part2) = self._flush_substitution(unprocessed.as_str());
+                let mut rv_part1= rv_part1.clone();
+                if rv_part2.is_some() {
+                    rv_part1.push_str(rv_part2.unwrap().as_str());
+                }
+                rv_part1
+            }
         }
-        None
+    }
+
+    fn _flush_substitution(&mut self, input: &str) -> (String, Option<String>) {
+        let mut curr_node = &self.tree;
+        let mut end_of_mapping = 0;
+        for (loc, ch) in input.char_indices() {
+            // We have already looked at this sequence, so we know that every character in input
+            // is mapped in the tree
+            curr_node = curr_node.children.get(&ch).unwrap();
+            if curr_node.output.is_some() {
+                end_of_mapping = loc;
+                println!("{}", end_of_mapping);
+            }
+        }
+        match &curr_node.output {
+            None => if end_of_mapping == 0 {
+                (input.to_string(), None)
+            }
+            else {
+                (self._flush_substitution(input.get(..end_of_mapping).unwrap()).0, input.get(end_of_mapping..).map(|s| s.to_string()))
+            },
+            Some(output) => (output.clone(), None)
+        }
     }
 }
 
@@ -80,10 +153,7 @@ impl SubstitutionTree {
     fn add(&mut self, input: &str, output: &str) {
         let mut current_child = self;
         for ch in input.chars() {
-            if !current_child.children.contains_key(&ch) {
-                current_child.children.insert(ch, SubstitutionTree::new());
-            }
-            current_child = current_child.children.get_mut(&ch).unwrap();
+            current_child = current_child.children.entry(ch).or_insert_with(|| SubstitutionTree::new());
         }
         if current_child.output.is_some() {
             let old_output = current_child.output.as_ref().unwrap();
@@ -150,20 +220,65 @@ mod tests {
     }
 
     #[test]
-    fn flush_clears_output_buffer() {
+    fn char_sub_machine_returns_original_string_when_no_substitution() {
         let mut char_sub_machine = CharSubMachine::new();
-        assert_eq!(None, char_sub_machine.flush());
-        char_sub_machine.output_buffer = Some("test".to_string());
-        assert_eq!(Some("test".to_string()), char_sub_machine.flush());
-        assert_eq!(None, char_sub_machine.flush());
+        assert_eq!("original", char_sub_machine.process("original"));
+        char_sub_machine.add_substitution("'", "’");
+        assert_eq!("original", char_sub_machine.process("original"));
     }
 
     #[test]
-    fn char_sub_machine_returns_original_string_when_no_substitution() {
+    fn char_sub_machine_handles_substitutions_mid_string() {
         let mut char_sub_machine = CharSubMachine::new();
-        assert_eq!("original", char_sub_machine.process("original").unwrap());
         char_sub_machine.add_substitution("'", "’");
-        assert_eq!("original", char_sub_machine.process("original").unwrap());
+        char_sub_machine.add_substitution("''", "”");
+        assert_eq!("it’s", char_sub_machine.process("it's"));
+    }
+
+    #[test]
+    fn char_sub_machine_handles_substitutions_at_end() {
+        let mut char_sub_machine = CharSubMachine::new();
+        char_sub_machine.add_substitution("'", "’");
+        char_sub_machine.add_substitution("''", "”");
+        assert_eq!("when”", char_sub_machine.process("when''"));
+    }
+    #[test]
+    fn char_sub_machine_can_handle_more_than_one_substitution() {
+        let mut char_sub_machine = CharSubMachine::new();
+        char_sub_machine.add_substitution("'", "’");
+        char_sub_machine.add_substitution("''", "”");
+        char_sub_machine.add_substitution("`", "‘");
+        char_sub_machine.add_substitution("``", "“");
+        assert_eq!("“it’s”", char_sub_machine.process("``it's''"));
+    }
+
+    #[test]
+    fn char_sub_machine_handles_stopping_mid_substitution_ok() {
+        let mut char_sub_machine = CharSubMachine::new();
+        char_sub_machine.add_substitution("'", "’");
+        char_sub_machine.add_substitution("''", "”");
+        char_sub_machine.add_substitution("`", "‘");
+        char_sub_machine.add_substitution("``", "“");
+        assert_eq!("if", char_sub_machine.process("if'"));
+        assert_eq!("’", char_sub_machine.flush());
+        assert_eq!("", char_sub_machine.flush());
+    }
+
+    #[test]
+    fn char_sub_machine_handles_substitutions_where_initial_or_middle_sequences_dont_terminate() {
+        let mut char_sub_machine = CharSubMachine::new();
+        char_sub_machine.add_substitution("ABC", "$$");
+        char_sub_machine.add_substitution("DEF", "!!");
+        assert_eq!("AB!!", char_sub_machine.process("ABDEF"));
+        // What about the end?
+        assert_eq!("$$", char_sub_machine.process("ABCDE"));
+        assert_eq!("DE", char_sub_machine.flush());
+        assert_eq!("", char_sub_machine.flush());
+
+        char_sub_machine = CharSubMachine::new();
+        char_sub_machine.add_substitution("12", "@");
+        char_sub_machine.add_substitution("123", "#");
+        assert_eq!("1 @ #", char_sub_machine.process("1 12 123"));
     }
 
     // Temporary test - manually verified
