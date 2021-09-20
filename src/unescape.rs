@@ -1,11 +1,18 @@
 //! Unescaping code
 //!
 //! Provides a function for converting Rust-style escaping of strings to the corresponding characters
-//! so that for example a string like
-//! > This isn\'t\nna\u{ef}ve
-//! and outputting it as
-//! > This isn't
-//! > naïve
+//! so that for example, given the following input
+//!
+//! ```text
+//! This isn\'t\nna\u{ef}ve
+//! ```
+//!
+//! the output will be
+//!
+//! ```text
+//! This isn't
+//! naïve
+//! ```
 
 use std::borrow::Cow;
 use thiserror::Error;
