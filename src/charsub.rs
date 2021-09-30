@@ -24,9 +24,10 @@
 
 use anyhow;
 use std::borrow::Cow;
-use std::collections::HashMap;
 use thiserror::Error;
 use std::io::{BufRead};
+use fnv::{FnvHashMap, FnvBuildHasher};
+use std::collections::HashMap;
 
 /// The implementation of a char substitution machine. This is a non-thread-safe implementation with
 /// mutable state.
@@ -243,14 +244,21 @@ pub enum CharSubError {
 #[derive(Debug)]
 struct SubstitutionTrie {
     output: Option<String>,
-    children: HashMap<char, SubstitutionTrie>,
+    children: HashMap<char, SubstitutionTrie, FnvBuildHasher>,
 }
 
 impl SubstitutionTrie {
     fn new() -> SubstitutionTrie {
         SubstitutionTrie {
             output: None, // The root does not map anything
-            children: HashMap::new(),
+            children: FnvHashMap::with_capacity_and_hasher(127, FnvBuildHasher::default()),
+        }
+    }
+
+    fn default() -> SubstitutionTrie {
+        SubstitutionTrie {
+            output: None,
+            children: FnvHashMap::default(),
         }
     }
 
@@ -261,7 +269,7 @@ impl SubstitutionTrie {
             current_child = current_child
                 .children
                 .entry(ch)
-                .or_insert_with(|| SubstitutionTrie::new());
+                .or_insert_with(|| SubstitutionTrie::default());
         }
         if current_child.output.is_some() {
             let old_output = current_child.output.as_ref().unwrap();
