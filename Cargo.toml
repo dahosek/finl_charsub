@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.40"
 thiserror = "1.0"
+fnv = "1.0.3"
 
 [dev-dependencies]
 criterion = "0.3"

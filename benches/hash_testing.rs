@@ -16,11 +16,23 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     path.push("sample.tex");
     let input_data = fs::read_to_string(path).unwrap();
 
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("resources");
+    path.push("chinese-sample.txt");
+    let chinese_txt = fs::read_to_string(path).unwrap();
+
     c.bench_function("Process sample TeX file",
         |b| b.iter(|| {
             let mut char_sub_machine = CharSubMachine::from_buf_reader(&mut Cursor::new(&charsub_data)).unwrap();
             char_sub_machine.process(&input_data.as_str())
         })
+    );
+
+    c.bench_function("Process sample Chinese text file",
+                     |b| b.iter(|| {
+                         let mut char_sub_machine = CharSubMachine::from_buf_reader(&mut Cursor::new(&charsub_data)).unwrap();
+                         char_sub_machine.process(&chinese_txt.as_str())
+                     })
     );
 
     // c.bench_with_input(BenchmarkId::new("Process article","(input_data and charsub_data)"),
