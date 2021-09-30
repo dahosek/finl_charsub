@@ -26,7 +26,7 @@ use anyhow;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use thiserror::Error;
-use std::io::{Read, BufReader, BufRead};
+use std::io::{BufRead};
 
 /// The implementation of a char substitution machine. This is a non-thread-safe implementation with
 /// mutable state.
@@ -48,7 +48,7 @@ impl CharSubMachine {
     /// as a `std::io::buffered::BufReader`. Since errors might occur during the read process, the result
     /// is wrapped in `anyhow::Result`. Errors can be of type `CharSubError`, `UnescapeError` or `io::Error`
     /// depending on the origin of the error.
-    pub fn from_buf_reader<R: Read>(input: &mut BufReader<R>) -> anyhow::Result<CharSubMachine> {
+    pub fn from_buf_reader<R: BufRead>(input: &mut R) -> anyhow::Result<CharSubMachine> {
         let mut return_value = CharSubMachine::new();
         for result in input.lines()
                 .map(|l| {
@@ -103,16 +103,16 @@ impl CharSubMachine {
                         None => {
                             let (substitution, remainder) = self
                                 ._flush_substitution(input.get(substitution_start..loc).unwrap());
-                            &built_value
+                            built_value
                                 .as_mut()
                                 .unwrap()
                                 .push_str(substitution.as_str());
                             if let Some(remainder) = remainder {
-                                &built_value.as_mut().unwrap().push_str(remainder.as_str());
+                                built_value.as_mut().unwrap().push_str(remainder.as_str());
                             }
                         }
                         Some(substitution) => {
-                            &built_value
+                            built_value
                                 .as_mut()
                                 .unwrap()
                                 .push_str(substitution.as_str());
@@ -125,7 +125,7 @@ impl CharSubMachine {
             if curr_node.children.contains_key(&ch) {
                 if built_value.is_none() {
                     built_value = Some(String::with_capacity(input.len()));
-                    &built_value
+                    built_value
                         .as_mut()
                         .unwrap()
                         .push_str(input.get(..loc).unwrap());
@@ -143,7 +143,7 @@ impl CharSubMachine {
         }
         if in_substitution {
             if curr_node.children.is_empty() {
-                &built_value
+                built_value
                     .as_mut()
                     .unwrap()
                     .push_str(&curr_node.output.as_ref().unwrap().as_str());

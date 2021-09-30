@@ -8,3 +8,10 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.40"
 thiserror = "1.0"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "hash_testing"
+harness = false
