@@ -1,0 +1,16 @@
+    This file provides a mapping for the standard TeX input conventions to Unicode. While not perfect—this kind of
+    mapping can run into issues if you are remapping alphabetic characters in a context where there might be case
+    manipulation (e.g., if a| maps to ᾳ, does A| map to ΑΙ or Αι? the former is correct if we're in an all-caps
+    context and the letter if it's title-cased. And for added complications, some fonts would render it with an
+    iota subscript ᾼ. On the other hand, this allows for some clever things to happen like, within a program listing
+    we could easily replace every instance of <= with ≤ and no active characters are necessary for shortcuts like
+    ~ for non-breaking spaces.
+`	‘
+``	“
+'	’
+''	”
+--	–
+---	—
+!`	¡
+?`	¿
+~	\u{a0}

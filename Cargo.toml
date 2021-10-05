@@ -2,9 +2,20 @@
 name = "finl-charsub"
 version = "0.1.0"
 edition = "2018"
+authors = ["Don Hosek <don.hosek@gmail.com>"]
+license = "MIT OR Apache-2.0"
+description = "Character substitution module for in-line replacement of fixed strings"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = "1.0.40"
 thiserror = "1.0"
+fnv = "1.0.3"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "hash_testing"
+harness = false
