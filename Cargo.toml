@@ -2,7 +2,7 @@
 name = "finl-charsub"
 version = "0.1.0"
 edition = "2018"
-authors = "Don Hosek <don.hosek@gmail.com>"
+authors = ["Don Hosek <don.hosek@gmail.com>"]
 license = "MIT OR Apache-2.0"
 description = "Character substitution module for in-line replacement of fixed strings"
 
